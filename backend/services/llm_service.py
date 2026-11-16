@@ -50,8 +50,8 @@ def get_llm(temperature: float = 0.2, model: Optional[str] = None) -> ChatOpenAI
         temperature=temperature,
         api_key=api_key,
         base_url=base_url,
-        timeout=120,
-        max_retries=2,
+        timeout=30,
+        max_retries=1,
     )
 
 

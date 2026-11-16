@@ -64,6 +64,8 @@ Generate a comprehensive research plan with 4-6 targeted research questions."""
         logs.append(error_msg)
         errors = list(state.get("errors", []))
         errors.append(error_msg)
+        if "429" in str(e) or "credits" in str(e) or "RateLimit" in str(e):
+            raise RuntimeError(f"OpenAI API Quota Exhausted: {str(e)}")
         return {
             "errors": errors,
             "logs": logs,
