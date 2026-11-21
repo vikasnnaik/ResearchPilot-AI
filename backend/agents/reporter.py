@@ -5,7 +5,7 @@ Synthesizes the comprehensive, multi-section evidence-grounded final research do
 
 from typing import Dict, Any, List
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.services.llm_service import get_llm
+from backend.services.llm_service import get_llm, invoke_with_retry
 from backend.schemas import FinalReport, ResearchWorkflowState
 
 
@@ -73,10 +73,15 @@ Generate the comprehensive FinalReport with all required sections."""
     try:
         llm = get_llm(temperature=0.2)
         structured_llm = llm.with_structured_output(FinalReport)
-        report: FinalReport = structured_llm.invoke([
-            SystemMessage(content=REPORTER_SYSTEM_PROMPT),
-            HumanMessage(content=user_prompt)
-        ])
+        report: FinalReport = invoke_with_retry(
+            structured_llm,
+            [
+                SystemMessage(content=REPORTER_SYSTEM_PROMPT),
+                HumanMessage(content=user_prompt)
+            ],
+            max_retries=5,
+            base_delay=3.5
+        )
 
         report_dict = report.model_dump()
         logs.append(f"[Report Agent] Successfully generated final report: '{report.title}' with {len(report.key_findings)} key findings.")

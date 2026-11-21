@@ -7,7 +7,7 @@ detects empirical contradictions with contextual resolution, and calculates math
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.services.llm_service import get_llm
+from backend.services.llm_service import get_llm, invoke_with_retry
 from backend.schemas import (
     VerifiedClaim,
     Contradiction,
@@ -151,10 +151,15 @@ Detect any empirical contradictions between sources and provide contextual resol
     try:
         llm = get_llm(temperature=0.1)
         structured_llm = llm.with_structured_output(VerificationAgentOutput)
-        result: VerificationAgentOutput = structured_llm.invoke([
-            SystemMessage(content=VERIFIER_SYSTEM_PROMPT),
-            HumanMessage(content=prompt)
-        ])
+        result: VerificationAgentOutput = invoke_with_retry(
+            structured_llm,
+            [
+                SystemMessage(content=VERIFIER_SYSTEM_PROMPT),
+                HumanMessage(content=prompt)
+            ],
+            max_retries=3,
+            base_delay=2.5
+        )
 
         claims_list = [c.model_dump() for c in result.claims]
         # Grounding check: verify quotes in raw sources

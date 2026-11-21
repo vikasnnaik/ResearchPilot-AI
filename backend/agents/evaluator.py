@@ -7,7 +7,7 @@ and formulates follow-up queries for iterative research looping.
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.services.llm_service import get_llm
+from backend.services.llm_service import get_llm, invoke_with_retry
 from backend.schemas import GapAssessmentResult, InformationGap, ResearchWorkflowState
 
 
@@ -87,10 +87,15 @@ Determine if critical information gaps remain or if evidence is sufficient."""
     try:
         llm = get_llm(temperature=0.1)
         structured_llm = llm.with_structured_output(GapAssessmentResult)
-        result: GapAssessmentResult = structured_llm.invoke([
-            SystemMessage(content=EVALUATOR_SYSTEM_PROMPT),
-            HumanMessage(content=prompt)
-        ])
+        result: GapAssessmentResult = invoke_with_retry(
+            structured_llm,
+            [
+                SystemMessage(content=EVALUATOR_SYSTEM_PROMPT),
+                HumanMessage(content=prompt)
+            ],
+            max_retries=3,
+            base_delay=2.0
+        )
 
         if result.needs_more_research and result.gaps_identified:
             next_iter = iteration + 1

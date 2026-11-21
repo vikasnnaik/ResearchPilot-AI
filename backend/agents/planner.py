@@ -5,7 +5,7 @@ Analyzes the research objective and formulates 4-6 high-impact research question
 
 from typing import Dict, Any
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.services.llm_service import get_llm
+from backend.services.llm_service import get_llm, invoke_with_retry
 from backend.schemas import ResearchPlan, ResearchWorkflowState
 
 
@@ -46,10 +46,15 @@ Generate a comprehensive research plan with 4-6 targeted research questions."""
     try:
         # Use LangChain structured output
         structured_llm = llm.with_structured_output(ResearchPlan)
-        plan: ResearchPlan = structured_llm.invoke([
-            SystemMessage(content=PLANNER_SYSTEM_PROMPT),
-            HumanMessage(content=prompt)
-        ])
+        plan: ResearchPlan = invoke_with_retry(
+            structured_llm,
+            [
+                SystemMessage(content=PLANNER_SYSTEM_PROMPT),
+                HumanMessage(content=prompt)
+            ],
+            max_retries=3,
+            base_delay=2.0
+        )
 
         plan_dict = plan.model_dump()
         logs.append(f"[Planner Agent] Generated {len(plan.questions)} targeted research questions.")

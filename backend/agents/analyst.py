@@ -6,7 +6,7 @@ Extracts core thematic findings, categorizes evidence, and links findings to sou
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
-from backend.services.llm_service import get_llm
+from backend.services.llm_service import get_llm, invoke_with_retry
 from backend.schemas import Finding, ResearchWorkflowState
 
 
@@ -50,10 +50,11 @@ def analyze_research(state: ResearchWorkflowState) -> Dict[str, Any]:
 
     logs.append(f"[Analysis Agent] Synthesizing findings from {len(sources)} verified source documents...")
 
-    # Format source documents for prompt
+    # Format source documents for prompt with sensible character limit per source
     sources_text = ""
     for s in sources:
-        sources_text += f"\n--- SOURCE [{s.get('id', '')}]: {s.get('title', '')} ---\nURL: {s.get('url', '')}\nCONTENT: {s.get('content', '')}\n"
+        snippet = (s.get("content", "") or "")[:1200]
+        sources_text += f"\n--- SOURCE [{s.get('id', '')}]: {s.get('title', '')} ---\nURL: {s.get('url', '')}\nCONTENT: {snippet}\n"
 
     user_prompt = f"""Research Topic: {topic}
 
@@ -65,10 +66,15 @@ Perform deep synthesis and produce structured evidence-grounded findings with ex
     try:
         llm = get_llm(temperature=0.2)
         structured_llm = llm.with_structured_output(AnalysisResult)
-        result: AnalysisResult = structured_llm.invoke([
-            SystemMessage(content=ANALYST_SYSTEM_PROMPT),
-            HumanMessage(content=user_prompt)
-        ])
+        result: AnalysisResult = invoke_with_retry(
+            structured_llm,
+            [
+                SystemMessage(content=ANALYST_SYSTEM_PROMPT),
+                HumanMessage(content=user_prompt)
+            ],
+            max_retries=5,
+            base_delay=3.5
+        )
 
         findings_dict = [f.model_dump() for f in result.findings]
         logs.append(f"[Analysis Agent] Synthesized {len(findings_dict)} distinct categorized findings.")

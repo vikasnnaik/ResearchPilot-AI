@@ -12,7 +12,10 @@ from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
+backend_env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(backend_env_path):
+    load_dotenv(backend_env_path, override=True)
 
 from backend.schemas import ResearchRequest, ResearchResponse
 from backend.services.tavily_service import is_tavily_configured
@@ -151,6 +154,8 @@ def execute_research_endpoint(request: ResearchRequest):
             errors=final_state.get("errors") or None,
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         err_str = str(e)
         if "429" in err_str or "credits" in err_str or "RateLimit" in err_str:
             raise HTTPException(
